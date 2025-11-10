@@ -1,0 +1,31 @@
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: hf-bt
+
+steps:
+  - id: "Build and push image with Jib"
+    name: "gcr.io/cloud-builders/gradle"
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        ./gradlew --no-configuration-cache jib -Djib.to.image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/hf-bt:${SHORT_SHA}
+
+  - id: "Deploy to Cloud Run"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        ENV_VARS=""
+        if [ -n "${_BUCKET:-}" ]; then ENV_VARS="--set-env-vars hf-bt_STORAGE=gcs,hf-bt_BUCKET=${_BUCKET}"; fi
+        gcloud run deploy hf-bt \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=8080 \
+          --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/hf-bt:${SHORT_SHA} \
+          ${ENV_VARS}
+
+options:
+  logging: CLOUD_LOGGING_ONLY

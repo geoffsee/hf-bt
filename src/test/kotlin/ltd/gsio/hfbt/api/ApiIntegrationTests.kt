@@ -93,4 +93,29 @@ class ApiIntegrationTests {
         val body = result.response.contentAsString
         assertThat(body).contains("stub-config")
     }
+
+    @Test
+    fun `static UI page is served`() {
+        val result = mockMvc.get("/index.html")
+            .andExpect {
+                status { isOk() }
+                content { contentTypeCompatibleWith("text/html") }
+            }
+            .andReturn()
+        val html = result.response.contentAsString
+        assertThat(html).contains("HF-BT Torrent Catalog")
+        assertThat(html).contains("fetchCatalog")
+        assertThat(html).contains("/api/v1/catalog")
+    }
+
+    @Test
+    fun `catalog endpoint returns magnet URIs`() {
+        mockMvc.get("/api/v1/catalog")
+            .andExpect {
+                status { isOk() }
+                content { contentType(MediaType.APPLICATION_JSON) }
+                jsonPath("$.items[0].magnetUri", notNullValue())
+                jsonPath("$.items[0].magnetUri", startsWith("magnet:"))
+            }
+    }
 }

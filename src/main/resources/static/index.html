@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HF-BT Torrent Catalog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .search-box input:focus {
+            border-color: #667eea;
+        }
+        
+        .catalog {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .catalog-item {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .catalog-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+        }
+        
+        .catalog-item h2 {
+            color: #333;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            word-break: break-word;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .info-label {
+            font-weight: 600;
+        }
+        
+        .links {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .link-button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px 5px 5px 0;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+        
+        .magnet-link {
+            background: #667eea;
+            color: white;
+        }
+        
+        .magnet-link:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+        
+        .torrent-link {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .torrent-link:hover {
+            background: #38a169;
+            transform: scale(1.05);
+        }
+        
+        .copy-button {
+            background: #ed8936;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .copy-button:hover {
+            background: #dd6b20;
+            transform: scale(1.05);
+        }
+        
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 40px;
+        }
+        
+        .error {
+            background: #fc8181;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .empty {
+            text-align: center;
+            color: white;
+            font-size: 1.2em;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #48bb78;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease-out;
+            z-index: 1000;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 HF-BT Torrent Catalog</h1>
+            <p>Browse and download AI model torrents</p>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search for models...">
+        </div>
+        
+        <div id="catalogContainer"></div>
+    </div>
+
+    <script>
+        let allItems = [];
+        
+        async function fetchCatalog(query = '') {
+            const container = document.getElementById('catalogContainer');
+            container.innerHTML = '<div class="loading">Loading catalog...</div>';
+            
+            try {
+                const url = query ? `/api/v1/catalog?query=${encodeURIComponent(query)}` : '/api/v1/catalog';
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                allItems = data.items || [];
+                displayCatalog(allItems);
+            } catch (error) {
+                container.innerHTML = `<div class="error">Failed to load catalog: ${error.message}</div>`;
+                console.error('Error fetching catalog:', error);
+            }
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes === null || bytes === undefined) return 'N/A';
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Magnet link copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                showToast('Failed to copy to clipboard', true);
+            });
+        }
+        
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            if (isError) {
+                toast.style.background = '#fc8181';
+            }
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        function displayCatalog(items) {
+            const container = document.getElementById('catalogContainer');
+            
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty">No torrents found</div>';
+                return;
+            }
+            
+            const catalogHTML = items.map(item => `
+                <div class="catalog-item">
+                    <h2>${escapeHtml(item.id)}</h2>
+                    <div class="info-row">
+                        <span class="info-label">Revision:</span>
+                        <span>${escapeHtml(item.latestRev || 'N/A')}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Size:</span>
+                        <span>${formatBytes(item.sizeBytes)}</span>
+                    </div>
+                    <div class="links">
+                        ${item.magnetUri ? `
+                            <a href="${escapeHtml(item.magnetUri)}" class="link-button magnet-link">
+                                🧲 Open Magnet Link
+                            </a>
+                            <button onclick="copyToClipboard('${escapeHtml(item.magnetUri)}')" 
+                                    class="link-button copy-button">
+                                📋 Copy Magnet Link
+                            </button>
+                        ` : ''}
+                        ${item.torrentUrl ? `
+                            <a href="${escapeHtml(item.torrentUrl)}" 
+                               class="link-button torrent-link" 
+                               download>
+                                ⬇️ Download .torrent
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = `<div class="catalog">${catalogHTML}</div>`;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+        
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const query = e.target.value.trim();
+                fetchCatalog(query);
+            }, 300);
+        });
+        
+        // Initial load
+        fetchCatalog();
+    </script>
+</body>
+</html>
