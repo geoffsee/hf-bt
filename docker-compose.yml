@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hf-bt:local
+    container_name: hfbt-api
+    environment:
+      # You can override these with `-e` flags or a .env file.
+      - DEMO_PEER_ENABLED=${DEMO_PEER_ENABLED:-false}
+      - DEMO_PEER_IMPL=${DEMO_PEER_IMPL:-jetty}
+      - DEMO_PEER_URL=${DEMO_PEER_URL:-https://peer:4443/.well-known/webtransport}
+      - JAVA_OPTS=${JAVA_OPTS:-}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  peer:
+    build:
+      context: .
+      dockerfile: docker/peer/Dockerfile
+    image: hf-bt-peer:local
+    container_name: hfbt-peer
+    environment:
+      - PEER_HOST=0.0.0.0
+      - PEER_PORT=4443
+      - PEER_CERT=/app/dev-cert.pem
+      - PEER_KEY=/app/dev-key.pem
+    expose:
+      - "4443"
+    ports:
+      - "4443:4443"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket; s=socket.create_connection((\"127.0.0.1\", 4443), 1); s.close()'"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    profiles: ["peer"]
+
+# Convenience: when running with --profile peer, also pass env so API advertises the peer URL:
+# Example:
+#   DEMO_PEER_ENABLED=true DEMO_PEER_IMPL=aioquic \
+#   DEMO_PEER_URL=https://peer:4443/.well-known/webtransport \
+#   docker compose --profile peer up --build

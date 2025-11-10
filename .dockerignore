@@ -1,0 +1,22 @@
+# Build outputs
+/build
+/**/build
+/.gradle
+/**/.gradle
+/out
+/.idea
+*.iml
+*.log
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Node/npm (if present in future)
+node_modules
+npm-debug.log*
